@@ -8,12 +8,12 @@
 import random
 import telnetlib
 
+import logging
 import requests
 from bs4 import BeautifulSoup
 from scrapy import signals
 
-from py3_crawler.settings import PROXIES
-
+logger = logging.getLogger(__name__)
 
 class Py3CrawlerSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -113,10 +113,9 @@ class Py3CrawlerDownloaderMiddleware(object):
 class ProxyMiddleware(object):
     proxy_list = []
 
-    def __init__(self, spider):
+    def __init__(self):
         try:
-
-            spider.logger.info('Getting proxies from https://www.xicidaili.com/ ...')
+            logger.info('Getting proxies from https://www.xicidaili.com/ ...')
             headers = {
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
                 'Accept-Encoding': 'gzip, deflate, br',
@@ -130,36 +129,38 @@ class ProxyMiddleware(object):
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
             }
             response = requests.get('https://www.xicidaili.com/', headers=headers)
-            soup = BeautifulSoup(response.text)
+            soup = BeautifulSoup(response.text, 'lxml')
             trs = soup.find_all('tr')
             for tr in trs:
                 tds = tr.find_all('td')
                 if len(tds) < 8:
                     continue
-                ip = tds[1].string
-                port = tds[2].string
-                protocol = tds[5].string
-                self.proxy_list.append((ip, port, protocol))
-            if not self.proxy_list:
-                spider.logger.info('Failed to get any proxy!')
+                if tds[5].string.lower() not in ['http', 'https']:
+                    continue
+                ProxyMiddleware.proxy_list.append(tds[5].string.lower() + '://' + tds[1].string + ':' + tds[2].string)
+            if not ProxyMiddleware.proxy_list:
+                logger.info('Failed to get any proxy!')
             else:
-                spider.logger.info('Successfully got ' + str(len(self.proxy_list)) + 'proxies.')
+                logger.info('Successfully got ' + str(len(ProxyMiddleware.proxy_list)) + ' proxies.')
         except:
-            spider.logger.info('Exception occurd when getting proxies!')
+            logger.info('Exception occurd when getting proxies!')
 
     def process_request(self, request, spider):
         while True:
-            if not self.proxy_list:
-                spider.logger.info('The proxy list is empty!')
-                return
-            proxy = random.choice(self.proxy_list)
+            if not ProxyMiddleware.proxy_list:
+                logger.info('The proxy list is empty!')
+                break
+            proxy = random.choice(ProxyMiddleware.proxy_list)
             try:
-                telnetlib.Telnet(proxy[0], port=proxy[1], timeout=3)
+                ip = proxy.split('//')[-1].split(':')[0]
+                port = proxy.split('//')[-1].split(':')[1]
+                telnetlib.Telnet(ip, port=port, timeout=3)
             except:
-                self.proxy_list.remove(proxy)
-                spider.logger.info('Removed proxy: %s' % str(proxy))
+                ProxyMiddleware.proxy_list.remove(proxy)
+                logger.info('Removed proxy: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
             else:
                 request.meta['proxy'] = proxy
+                break
 
 
 
