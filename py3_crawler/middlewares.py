@@ -6,8 +6,10 @@
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
 import random
+import telnetlib
 
 import requests
+from bs4 import BeautifulSoup
 from scrapy import signals
 
 from py3_crawler.settings import PROXIES
@@ -109,25 +111,55 @@ class Py3CrawlerDownloaderMiddleware(object):
 
 
 class ProxyMiddleware(object):
-    def process_request(self, request, spider):
-        proxy = random.choice(PROXIES)
-        request.meta['proxy'] = proxy
+    proxy_list = []
 
-    def get_proxy(spider):
-        proxy_list = PROXIES
-        while True:
-            if not proxy_list:
-                spider.logger.info('No alive proxy!')
-                return
-            proxy = random.choice(proxy_list)
-            try:
-                proxies = {
-                    "http": proxy,
-                    "https": proxy,
-                }
-                requests.get('http://www.baidu.com', proxies=proxies)
-            except:
-                proxy_list.remove(proxy)
-                spider.logger.info('Removed proxy: %s' % proxy)
+    def __init__(self, spider):
+        try:
+
+            spider.logger.info('Getting proxies from https://www.xicidaili.com/ ...')
+            headers = {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Cache-Control': 'max-age=0',
+                'Connection': 'keep-alive',
+                # 'Cookie': '_free_proxy_session=BAh7B0kiD3Nlc3Npb25faWQGOgZFVEkiJTk1MWRkNWMwMzc5NTcwMmYxMGE3MTZkZTEzMTliZTc4BjsAVEkiEF9jc3JmX3Rva2VuBjsARkkiMUI5NXJ1ZmxOWG5ZM3lUR2tMWVk1eW9lMm1uakR5U0JYcTlUK25qNGRXZjg9BjsARg%3D%3D--6c734a7138e0a3804c29f05f15a333a49febd5ca; Hm_lvt_0cf76c77469e965d2957f0553e6ecf59=1560753157,1562131188; Hm_lpvt_0cf76c77469e965d2957f0553e6ecf59=1562572697',
+                'Host': 'www.xicidaili.com',
+                # 'If-None-Match': 'W/"adc819458dfd329611ea0c5894199c48"',
+                'Upgrade-Insecure-Requests': '1',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+            }
+            response = requests.get('https://www.xicidaili.com/', headers=headers)
+            soup = BeautifulSoup(response.text)
+            trs = soup.find_all('tr')
+            for tr in trs:
+                tds = tr.find_all('td')
+                if len(tds) < 8:
+                    continue
+                ip = tds[1].string
+                port = tds[2].string
+                protocol = tds[5].string
+                self.proxy_list.append((ip, port, protocol))
+            if not self.proxy_list:
+                spider.logger.info('Failed to get any proxy!')
             else:
-                return proxy
+                spider.logger.info('Successfully got ' + str(len(self.proxy_list)) + 'proxies.')
+        except:
+            spider.logger.info('Exception occurd when getting proxies!')
+
+    def process_request(self, request, spider):
+        while True:
+            if not self.proxy_list:
+                spider.logger.info('The proxy list is empty!')
+                return
+            proxy = random.choice(self.proxy_list)
+            try:
+                telnetlib.Telnet(proxy[0], port=proxy[1], timeout=3)
+            except:
+                self.proxy_list.remove(proxy)
+                spider.logger.info('Removed proxy: %s' % str(proxy))
+            else:
+                request.meta['proxy'] = proxy
+
+
+
