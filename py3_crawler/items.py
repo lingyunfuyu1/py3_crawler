@@ -15,6 +15,8 @@ class Py3CrawlerItem(scrapy.Item):
 
 
 class DoubanMovieItem(scrapy.Item):
+    # ID
+    id = scrapy.Field()
     # 排名
     ranking = scrapy.Field()
     # 电影名称

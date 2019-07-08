@@ -110,7 +110,7 @@ class Py3CrawlerDownloaderMiddleware(object):
 
 class ProxyMiddleware(object):
     def process_request(self, request, spider):
-        proxy = self.get_proxy(spider)
+        proxy = random.choice(PROXIES)
         request.meta['proxy'] = proxy
 
     def get_proxy(spider):

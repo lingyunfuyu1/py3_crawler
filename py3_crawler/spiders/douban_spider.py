@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import random
 import re
 import time
 
@@ -13,6 +14,8 @@ from selenium.webdriver.chrome.options import Options
 from py3_crawler.items import DoubanMovieItem
 
 
+meta_proxy = "http://163.204.241.154:9999"
+
 class DoubanMovieTop250Spider(Spider):
     name = 'douban_movie_top250'
 
@@ -22,7 +25,7 @@ class DoubanMovieTop250Spider(Spider):
 
     def start_requests(self):
         url = 'https://movie.douban.com/top250'
-        yield Request(url, headers=self.headers)
+        yield Request(url, headers=self.headers, meta={'proxy': meta_proxy})
 
     def parse(self, response):
         # 命令行调试代码
@@ -80,50 +83,80 @@ class DoubanAJAXSpider(Spider):
 
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
+    proxy = 'http://222.240.184.126:8086'
+    source_file_name = 'india.9-10.txt'
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
     }
 
-    def start_requests(self):
+    def start_requests1(self):
         options = Options()
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')
+        if self.proxy:
+            options.add_argument('--proxy-server=' + self.proxy)
         driver = webdriver.Chrome(options=options)
-        # 大陆
-        url = 'https://movie.douban.com/tag/#/?sort=S&range=6,10&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
-        # 香港
-        # url = 'https://movie.douban.com/tag/#/?sort=S&range=6,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
-        # 台湾
-        # url = 'https://movie.douban.com/tag/#/?sort=S&range=6,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
-        driver.get(url)
+        # 大陆8-10分电影
+        url_dl = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
+        # 香港8-10分电影
+        url_xg = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
+        # 台湾8-10分电影
+        url_tw = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
+        #
+        url_india = 'https://movie.douban.com/tag/#/?sort=T&range=9,10&tags=%E5%8D%B0%E5%BA%A6,%E7%94%B5%E5%BD%B1'
+        driver.get(url_india)
         # 点击加载更多，直到全部加载完成
         a_more = 'pre-defined'
         while a_more:
             try:
                 a_more = driver.find_element_by_class_name('more')
-                a_more.click()
-                time.sleep(3)
+                # a_more.click()
+                driver.execute_script("arguments[0].click();", a_more)
+                time.sleep(2 + random.random() * 3)
             except NoSuchElementException:
                 a_more = ''
         # 获取电影链接
         element_list = driver.find_element_by_class_name('list-wp').find_elements_by_tag_name('a')
+        movie_url_file = open('data/' + self.source_file_name, 'w')
         for i in range(len(element_list)):
             url = element_list[i].get_attribute('href')
-            yield Request(url, headers=self.headers)
+            movie_url_file.write(url + '\n')
+            time.sleep(2 + random.random() * 3)
+            if url:
+                yield Request(url, headers=self.headers, meta={'url': url})
+        movie_url_file.close()
+
+    def start_requests(self):
+        source_file_name = 'india.9-10.txt'
+        url_list = open('data/' + self.source_file_name).readlines()
+        url_except_list = open('data/' + self.source_file_name + '.except').readlines()
+        for url in url_list:
+            if url in url_except_list:
+                continue
+            time.sleep(2 + random.random() * 3)
+            yield Request(url.strip(), headers=self.headers, meta={'url': url})
 
     def parse(self, response):
         # 命令行调试代码
         # from scrapy.shell import inspect_response
         # inspect_response(response, self)
-
+        url = response.meta.get('url')
+        url_except_file = open('data/' + self.source_file_name + '.except', 'a')
+        url_except_file.write(url)
+        url_except_file.close()
         item = DoubanMovieItem()
+        item['id'] = url.split('/')[-2]
         movie = response.xpath('//div[@id="content"]')
-        item['movie_name'] = movie.xpath('.//h1/span[1]/text()').extract()[0]
-        item['year'] = movie.xpath('.//h1/span[2]/text()').extract()[0].replace('(', '').replace(')', '')
+        item['movie_name'] = movie.xpath('.//h1/span[1]/text()').extract_first()
+        item['year'] = str(movie.xpath('.//h1/span[2]/text()').extract_first()).replace('(', '').replace(')', '')
         item['director'] = '/'.join(movie.xpath('.//span[contains(text(), "导演")]/following-sibling::*[1]/a/text()').extract())
         item['screenwriter'] = '/'.join(movie.xpath('.//span[contains(text(), "编剧")]/following-sibling::*[1]/a/text()').extract())
         item['leading_actors'] = '/'.join(movie.xpath('.//span[contains(text(), "主演")]/following-sibling::*[1]/a/text()').extract())
-        item['type'] = '/'.join(movie.xpath('.//span[contains(text(), "类型")]/following-sibling::*[1]/a/text()').extract())
+        item['type'] = '/'.join(movie.xpath('.//span[@property="v:genre"]/text()').extract())
         item['score'] = movie.xpath('.//strong[contains(@class, "rating_num")]/text()').extract_first()
         item['score_num'] = movie.xpath('.//a[@class="rating_people"]/span/text()').extract_first()
         yield item
+
+
+# scrapy crawl douban_favorite -o result/douban_favorite_xg.8-9.OK.csv

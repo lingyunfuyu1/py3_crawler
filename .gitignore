@@ -199,4 +199,5 @@ fabric.properties
 .idea/modules.xml
 .idea/py3_crawler.iml
 .idea/vcs.xml
-data/
+data/*
+result/
