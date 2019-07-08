@@ -159,4 +159,4 @@ class DoubanFavoriteSpider(Spider):
         yield item
 
 
-# scrapy crawl douban_favorite -o result/douban_favorite_xg.8-9.OK.csv
+# python3 -m scrapy crawl douban_favorite -o data/result/douban_favorite_TEST.csv
