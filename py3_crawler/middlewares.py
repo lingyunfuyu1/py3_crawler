@@ -12,6 +12,8 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 from scrapy import signals
+from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.utils.response import response_status_message
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +131,7 @@ class ProxyMiddleware(object):
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
             }
             response = requests.get('https://www.xicidaili.com/', headers=headers)
-            soup = BeautifulSoup(response.text, 'lxml')
+            soup = BeautifulSoup(response.text, 'html.parser')
             trs = soup.find_all('tr')
             for tr in trs:
                 tds = tr.find_all('td')
@@ -145,7 +147,8 @@ class ProxyMiddleware(object):
         except:
             logger.info('Exception occurd when getting proxies!')
 
-    def process_request(self, request, spider):
+    @staticmethod
+    def process_request(request, spider):
         while True:
             if not ProxyMiddleware.proxy_list:
                 logger.info('The proxy list is empty!')
@@ -157,10 +160,31 @@ class ProxyMiddleware(object):
                 telnetlib.Telnet(ip, port=port, timeout=3)
             except:
                 ProxyMiddleware.proxy_list.remove(proxy)
-                logger.info('Removed proxy: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+                logger.info('Removed proxy due to Telnet: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
             else:
                 request.meta['proxy'] = proxy
                 break
 
 
+class XHRetryMiddleware(RetryMiddleware):
+    logger = logging.getLogger(__name__)
 
+    @staticmethod
+    def delete_proxy(proxy):
+        if proxy:
+            logger.info('Removed proxy due to HTTP-403: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+            ProxyMiddleware.proxy_list.remove(proxy)
+
+    def process_response(self, request, response, spider):
+        if request.meta.get('dont_retry', False):
+            return response
+        if response.status in ['403']:
+            self.delete_proxy(request.meta.get('proxy', False))
+        if response.status in self.retry_http_codes:
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
+        return response
+
+    def process_exception(self, request, exception, spider):
+        if isinstance(exception, self.EXCEPTIONS_TO_RETRY) and not request.meta.get('dont_retry', False):
+            return self._retry(request, exception, spider)
