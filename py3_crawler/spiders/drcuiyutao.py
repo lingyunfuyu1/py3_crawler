@@ -49,7 +49,7 @@ class DrcuiyutaoSpider(scrapy.Spider):
         if next_page:
             yield Request('http://m.drcuiyutao.com' + next_page, callback=self.parse_coup, meta={'coup': coup})
         else:
-            result_file = open('result/drcuiyutao.txt', 'a')
+            result_file = open('data/result/drcuiyutao.txt', 'a')
             result_file.write('-' * 50 + '\n')
             result_file.write(coup.get('author').strip().replace('\r\n', '').replace('\n', '') + ' ' + coup.get('time').strip().replace('\r\n', '').replace('\n', '') + '\n')
             result_file.write('【帖子】\n')
