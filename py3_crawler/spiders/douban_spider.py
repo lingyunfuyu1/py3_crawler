@@ -84,7 +84,7 @@ class DoubanAJAXSpider(Spider):
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
     proxy = 'http://222.240.184.126:8086'
-    source_file_name = 'india.9-10.txt'
+    source_file_name = 'hg.7-10.txt'
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
@@ -128,7 +128,6 @@ class DoubanFavoriteSpider(Spider):
         movie_url_file.close()
 
     def start_requests(self):
-        source_file_name = 'india.9-10.txt'
         url_list = open('data/' + self.source_file_name).readlines()
         url_except_list = open('data/' + self.source_file_name + '.except').readlines()
         for url in url_list:

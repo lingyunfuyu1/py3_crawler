@@ -18,7 +18,7 @@ NEWSPIDER_MODULE = 'py3_crawler.spiders'
 # USER_AGENT = 'py3_crawler (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 # CONCURRENT_REQUESTS = 32
@@ -55,6 +55,8 @@ DOWNLOADER_MIDDLEWARES = {
     # 'py3_crawler.middlewares.Py3CrawlerDownloaderMiddleware': 543,
     'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware': None,
     'py3_crawler.middlewares.ProxyMiddleware': 100,
+    "scrapy.contrib.downloadermiddleware.redirect.RedirectMiddleware": None,
+    "py3_crawler.middlewares.XHRetryMiddleware": 101,
 }
 
 # Enable or disable extensions
@@ -102,12 +104,6 @@ LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_LEVEL = 'INFO'
 LOG_STDOUT = True
 
-PROXIES = [
-    'https://122.141.74.186:8080',
-    'https://61.128.208.94:3128',
-    'http://58.249.55.222:9797',
-    'http://119.123.179.163:9000',
-    'http://58.243.50.184:53281',
-    'http://175.6.5.234:8888',
-    'http://112.250.107.37:53281',
-]
+RETRY_ENABLED = True
+RETRY_TIMES = 5
+RETRY_HTTP_CODES = [500, 502, 503, 504, 400, 408]

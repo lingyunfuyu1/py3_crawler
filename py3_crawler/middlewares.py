@@ -13,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from scrapy import signals
 from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.exceptions import NotConfigured
 from scrapy.utils.response import response_status_message
 
 logger = logging.getLogger(__name__)
@@ -167,19 +168,14 @@ class ProxyMiddleware(object):
 
 
 class XHRetryMiddleware(RetryMiddleware):
-    logger = logging.getLogger(__name__)
-
-    @staticmethod
-    def delete_proxy(proxy):
-        if proxy:
-            logger.info('Removed proxy due to HTTP-403: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
-            ProxyMiddleware.proxy_list.remove(proxy)
-
     def process_response(self, request, response, spider):
         if request.meta.get('dont_retry', False):
             return response
-        if response.status in ['403']:
-            self.delete_proxy(request.meta.get('proxy', False))
+        if response.status in [302, 403, 404]:
+            logger.info('Failed URL:' + response.url + '[' + str(response.status) + '] proxy:' + str(request.meta.get('proxy', None)))
+            # self.delete_proxy(request.meta.get('proxy', None))
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
         if response.status in self.retry_http_codes:
             reason = response_status_message(response.status)
             return self._retry(request, reason, spider) or response
@@ -188,3 +184,9 @@ class XHRetryMiddleware(RetryMiddleware):
     def process_exception(self, request, exception, spider):
         if isinstance(exception, self.EXCEPTIONS_TO_RETRY) and not request.meta.get('dont_retry', False):
             return self._retry(request, exception, spider)
+
+    @staticmethod
+    def delete_proxy(proxy):
+        if proxy:
+            logger.info('Removed proxy due to Http-Error-Code: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+            ProxyMiddleware.proxy_list.remove(proxy)
