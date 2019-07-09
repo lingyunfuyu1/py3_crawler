@@ -157,17 +157,22 @@ class ProxyMiddleware(object):
             # proxy = random.choice(ProxyMiddleware.proxy_list)
             # 依次使用
             proxy = ProxyMiddleware.proxy_list[0]
-            try:
-                ip = proxy.split('//')[-1].split(':')[0]
-                port = proxy.split('//')[-1].split(':')[1]
-                telnetlib.Telnet(ip, port=port, timeout=3)
-            except:
-                ProxyMiddleware.proxy_list.remove(proxy)
-                logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
-            else:
-                request.meta['proxy'] = proxy
+            ip = proxy.split('//')[-1].split(':')[0]
+            port = proxy.split('//')[-1].split(':')[1]
+            max_check_times = 3
+            for i in range(max_check_times):
+                try:
+                    telnetlib.Telnet(ip, port=port, timeout=3)
+                except:
+                    if i + 1 >= max_check_times:
+                        ProxyMiddleware.proxy_list.remove(proxy)
+                        logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+                else:
+                    request.meta['proxy'] = proxy
+                    break
+            proxy = request.meta.get('proxy', None)
+            if proxy:
                 break
-
 
 class XHRetryMiddleware(RetryMiddleware):
     def process_response(self, request, response, spider):

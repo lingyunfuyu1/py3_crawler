@@ -12,7 +12,7 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 
 from py3_crawler.items import DoubanMovieItem
-
+from py3_crawler.middlewares import ProxyMiddleware
 
 meta_proxy = "http://163.204.241.154:9999"
 
@@ -144,13 +144,19 @@ class DoubanFavoriteSpider(Spider):
         # 命令行调试代码
         # from scrapy.shell import inspect_response
         # inspect_response(response, self)
+        movie = response.xpath('//div[@id="content"]')
+        if not movie:
+            self.logger.info('response:' + response.text)
+            proxy = response.meta.get('proxy', None)
+            if proxy in ProxyMiddleware.proxy_list:
+                ProxyMiddleware.proxy_list.remove(response.meta.get('proxy', None))
+            return
         url = response.meta.get('url')
         url_except_file = open('data/' + self.source_file_name + '.except', 'a')
         url_except_file.write(url)
         url_except_file.close()
         item = DoubanMovieItem()
         item['id'] = url.split('/')[-2]
-        movie = response.xpath('//div[@id="content"]')
         item['movie_name'] = movie.xpath('.//h1/span[1]/text()').extract_first()
         item['year'] = str(movie.xpath('.//h1/span[2]/text()').extract_first()).replace('(', '').replace(')', '')
         item['director'] = '/'.join(movie.xpath('.//span[contains(text(), "导演")]/following-sibling::*[1]/a/text()').extract())
