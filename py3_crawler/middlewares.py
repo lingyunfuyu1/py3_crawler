@@ -150,9 +150,11 @@ class ProxyMiddleware(object):
     @staticmethod
     def process_request(request, spider):
         while True:
+            if 'proxy' in request.meta:
+                return
             if not ProxyMiddleware.proxy_list:
                 logger.info('The proxy list is empty!')
-                break
+                return
             # 随机选择
             # proxy = random.choice(ProxyMiddleware.proxy_list)
             # 依次使用
@@ -169,10 +171,8 @@ class ProxyMiddleware(object):
                         logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
                 else:
                     request.meta['proxy'] = proxy
-                    break
-            proxy = request.meta.get('proxy', None)
-            if proxy:
-                break
+                    return
+
 
 class XHRetryMiddleware(RetryMiddleware):
     def process_response(self, request, response, spider):
