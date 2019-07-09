@@ -136,6 +136,7 @@ class DoubanFavoriteSpider(Spider):
             time.sleep(2 + random.random() * 3)
             meta = {
                 'url': url,
+                'disable_proxy': True,
                 # 'dont_retry': True,
             }
             yield Request(url.strip(), headers=self.headers, meta=meta)
