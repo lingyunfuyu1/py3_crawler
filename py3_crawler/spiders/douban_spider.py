@@ -137,6 +137,7 @@ class DoubanFavoriteSpider(Spider):
             meta = {
                 'url': url,
                 'disable_proxy': True,
+                # 'proxy': 'https://101.6.54.76:8118',
                 # 'dont_retry': True,
             }
             yield Request(url.strip(), headers=self.headers, meta=meta)

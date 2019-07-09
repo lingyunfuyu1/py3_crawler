@@ -173,7 +173,8 @@ class ProxyMiddleware(object):
                         logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
                 else:
                     request.meta['proxy'] = proxy
-                    break
+                    return
+
 
 class XHRetryMiddleware(RetryMiddleware):
     def process_response(self, request, response, spider):
