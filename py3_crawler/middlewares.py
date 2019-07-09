@@ -117,6 +117,7 @@ class ProxyMiddleware(object):
 
     def __init__(self):
         try:
+            # 从https://www.xicidaili.com/获取代理
             logger.info('Getting proxies from https://www.xicidaili.com/ ...')
             headers = {
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
@@ -140,23 +141,56 @@ class ProxyMiddleware(object):
                 if tds[5].string.lower() not in ['http', 'https']:
                     continue
                 ProxyMiddleware.proxy_list.append(tds[5].string.lower() + '://' + tds[1].string + ':' + tds[2].string)
-            if not ProxyMiddleware.proxy_list:
-                logger.info('Failed to get any proxy!')
-            else:
-                logger.info('Successfully got ' + str(len(ProxyMiddleware.proxy_list)) + ' proxies.')
         except:
-            logger.info('Exception occurd when getting proxies!')
+            logger.info('Exception occurd when getting proxies from https://www.xicidaili.com/')
+        try:
+            # 从http://www.xiladaili.com/获取代理
+            logger.info('Getting proxies from https://www.xiladaili.com/ ...')
+            headers = {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Cache-Control': 'max-age=0',
+                'Connection': 'keep-alive',
+                # 'Cookie': 'Hm_lvt_e556949542df6146a3d727d8ad4a49e6=1562655394; Hm_lpvt_e556949542df6146a3d727d8ad4a49e6=1562655394',
+                'Host': 'www.xiladaili.com',
+                'Upgrade-Insecure-Requests': '1',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+            }
+            response = requests.get('http://www.xiladaili.com/', headers=headers)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            trs = soup.find_all('tr')
+            for tr in trs:
+                tds = tr.find_all('td')
+                if len(tds) < 8:
+                    continue
+                protocol = tds[2].string.lower()
+                if protocol not in ['http', 'https', 'http,https']:
+                    continue
+                if protocol.find(',') != -1:
+                    protocol = protocol.split(',')[0]
+                ProxyMiddleware.proxy_list.append(protocol + '://' + tds[0].string)
+        except:
+            logger.info('Exception occurd when getting proxies from http://www.xiladaili.com/')
+        # 统计获取的代理
+        if not ProxyMiddleware.proxy_list:
+            logger.info('Failed to get any proxy!')
+        else:
+            logger.info('Successfully got ' + str(len(ProxyMiddleware.proxy_list)) + ' proxies.')
 
     @staticmethod
     def process_request(request, spider):
         while True:
+            # 手工设置禁用proxy
             if request.meta.get('disable_proxy', False):
+                # if 'proxy' in request.meta:
+                #     del request.meta['proxy']
                 return
+            # 手工设置的proxy优先
             if 'proxy' in request.meta:
                 return
             if not ProxyMiddleware.proxy_list:
-                logger.info('The proxy list is empty!')
-                return
+                raise NoAvailableProxy
             # 随机选择
             # proxy = random.choice(ProxyMiddleware.proxy_list)
             # 依次使用
@@ -170,7 +204,7 @@ class ProxyMiddleware(object):
                 except:
                     if i + 1 >= max_check_times:
                         ProxyMiddleware.proxy_list.remove(proxy)
-                        logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+                        logger.info('Remove proxy due to Telnet-Error: %s [%s remaining]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
                 else:
                     request.meta['proxy'] = proxy
                     return
@@ -198,3 +232,6 @@ class XHRetryMiddleware(RetryMiddleware):
             logger.info("Retry from XHRetryMiddleware.process_exception: " + request.url)
             return self._retry(request, exception, spider)
 
+
+class NoAvailableProxy(Exception):
+    pass
