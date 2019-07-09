@@ -5,15 +5,14 @@
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
+import logging
 import random
 import telnetlib
 
-import logging
 import requests
 from bs4 import BeautifulSoup
 from scrapy import signals
 from scrapy.downloadermiddlewares.retry import RetryMiddleware
-from scrapy.exceptions import NotConfigured
 from scrapy.utils.response import response_status_message
 
 logger = logging.getLogger(__name__)
@@ -154,14 +153,17 @@ class ProxyMiddleware(object):
             if not ProxyMiddleware.proxy_list:
                 logger.info('The proxy list is empty!')
                 break
-            proxy = random.choice(ProxyMiddleware.proxy_list)
+            # 随机选择
+            # proxy = random.choice(ProxyMiddleware.proxy_list)
+            # 依次使用
+            proxy = ProxyMiddleware.proxy_list[0]
             try:
                 ip = proxy.split('//')[-1].split(':')[0]
                 port = proxy.split('//')[-1].split(':')[1]
                 telnetlib.Telnet(ip, port=port, timeout=3)
             except:
                 ProxyMiddleware.proxy_list.remove(proxy)
-                logger.info('Removed proxy due to Telnet: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+                logger.info('Remove proxy due to Telnet-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
             else:
                 request.meta['proxy'] = proxy
                 break
@@ -169,24 +171,23 @@ class ProxyMiddleware(object):
 
 class XHRetryMiddleware(RetryMiddleware):
     def process_response(self, request, response, spider):
+        logger.info('[' + str(response.status) + '] ' + response.url + ' proxy:' + str(request.meta.get('proxy', '')))
         if request.meta.get('dont_retry', False):
+            logger.info("request.meta.get('dont_retry') is set to 'True'. No need to retry.")
             return response
-        if response.status in [302, 403, 404]:
-            logger.info('Failed URL:' + response.url + '[' + str(response.status) + '] proxy:' + str(request.meta.get('proxy', None)))
-            # self.delete_proxy(request.meta.get('proxy', None))
-            reason = response_status_message(response.status)
-            return self._retry(request, reason, spider) or response
+        proxy = request.meta.get('proxy', None)
+        if response.status in [403, 404] and proxy in ProxyMiddleware.proxy_list:
+            logger.info('Remove proxy due to Http-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+            ProxyMiddleware.proxy_list.remove(proxy)
         if response.status in self.retry_http_codes:
+            logger.info("Retry from XHRetryMiddleware.process_response: " + request.url)
             reason = response_status_message(response.status)
             return self._retry(request, reason, spider) or response
         return response
 
     def process_exception(self, request, exception, spider):
+        logger.info('[' + str(exception) + '] ' + request.url + ' proxy:' + str(request.meta.get('proxy', '')))
         if isinstance(exception, self.EXCEPTIONS_TO_RETRY) and not request.meta.get('dont_retry', False):
+            logger.info("Retry from XHRetryMiddleware.process_exception: " + request.url)
             return self._retry(request, exception, spider)
 
-    @staticmethod
-    def delete_proxy(proxy):
-        if proxy:
-            logger.info('Removed proxy due to Http-Error-Code: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
-            ProxyMiddleware.proxy_list.remove(proxy)

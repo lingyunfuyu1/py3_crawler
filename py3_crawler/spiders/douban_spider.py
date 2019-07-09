@@ -134,7 +134,11 @@ class DoubanFavoriteSpider(Spider):
             if url in url_except_list:
                 continue
             time.sleep(2 + random.random() * 3)
-            yield Request(url.strip(), headers=self.headers, meta={'url': url})
+            meta = {
+                'url': url,
+                # 'dont_retry': True,
+            }
+            yield Request(url.strip(), headers=self.headers, meta=meta)
 
     def parse(self, response):
         # 命令行调试代码
