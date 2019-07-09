@@ -81,7 +81,7 @@ class DoubanAJAXSpider(Spider):
 
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
-    source_file_name = 'hg.7-10.txt'
+    source_file_name = 'all.9-10.txt'
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
@@ -112,7 +112,7 @@ class DoubanFavoriteSpider(Spider):
             self.logger.info('response:' + response.text)
             proxy = response.meta.get('proxy', None)
             if proxy in ProxyMiddleware.proxy_list:
-                ProxyMiddleware.proxy_list.remove(response.meta.get('proxy', None))
+                ProxyMiddleware.proxy_list.remove(response.meta.get('proxy'))
             return
         url = response.meta.get('url')
         url_except_file = open('data/' + self.source_file_name + '.except', 'a')
@@ -134,7 +134,7 @@ class DoubanFavoriteSpider(Spider):
         options = Options()
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')
-        options.add_argument('--proxy-server=http://222.240.184.126:8086')
+        # options.add_argument('--proxy-server=http://222.240.184.126:8086')
         driver = webdriver.Chrome(options=options)
         # 大陆8-10分电影
         url_dl = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
@@ -142,7 +142,9 @@ class DoubanFavoriteSpider(Spider):
         url_xg = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
         # 台湾8-10分电影
         url_tw = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
-        driver.get(url_dl)
+        #
+        url_all = 'https://movie.douban.com/tag/#/?sort=T&range=9,10&tags=%E7%94%B5%E5%BD%B1'
+        driver.get(url_all)
         # 点击加载更多，直到全部加载完成
         a_more = 'pre-defined'
         while a_more:
