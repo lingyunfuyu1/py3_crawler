@@ -97,6 +97,7 @@ class DoubanFavoriteSpider(Spider):
             time.sleep(2 + random.random() * 3)
             meta = {
                 'url': url,
+                'disable_proxy': True,
                 # 'proxy': 'https://101.6.54.76:8118',
                 # 'dont_retry': True,
             }

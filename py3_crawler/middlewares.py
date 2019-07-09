@@ -150,6 +150,8 @@ class ProxyMiddleware(object):
     @staticmethod
     def process_request(request, spider):
         while True:
+            if request.meta.get('disable_proxy', False):
+                return
             if 'proxy' in request.meta:
                 return
             if not ProxyMiddleware.proxy_list:
