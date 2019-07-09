@@ -14,7 +14,6 @@ from selenium.webdriver.chrome.options import Options
 from py3_crawler.items import DoubanMovieItem
 from py3_crawler.middlewares import ProxyMiddleware
 
-meta_proxy = "http://163.204.241.154:9999"
 
 class DoubanMovieTop250Spider(Spider):
     name = 'douban_movie_top250'
@@ -25,7 +24,7 @@ class DoubanMovieTop250Spider(Spider):
 
     def start_requests(self):
         url = 'https://movie.douban.com/top250'
-        yield Request(url, headers=self.headers, meta={'proxy': meta_proxy})
+        yield Request(url, headers=self.headers, meta={'proxy': 'http://163.204.241.154:9999'})
 
     def parse(self, response):
         # 命令行调试代码
@@ -73,7 +72,6 @@ class DoubanAJAXSpider(Spider):
                 item['score'] = data['score']
                 item['score_num'] = data['vote_count']
                 yield item
-
             # 如果datas存在数据则对下一页进行采集
             page_num = re.search(r'start=(\d+)', response.url).group(1)
             page_num = 'start=' + str(int(page_num) + 20)
@@ -83,51 +81,14 @@ class DoubanAJAXSpider(Spider):
 
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
-    proxy = 'http://222.240.184.126:8086'
     source_file_name = 'hg.7-10.txt'
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
     }
 
-    def start_requests1(self):
-        options = Options()
-        options.add_argument('--headless')
-        options.add_argument('--disable-gpu')
-        if self.proxy:
-            options.add_argument('--proxy-server=' + self.proxy)
-        driver = webdriver.Chrome(options=options)
-        # 大陆8-10分电影
-        url_dl = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
-        # 香港8-10分电影
-        url_xg = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
-        # 台湾8-10分电影
-        url_tw = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
-        #
-        url_india = 'https://movie.douban.com/tag/#/?sort=T&range=9,10&tags=%E5%8D%B0%E5%BA%A6,%E7%94%B5%E5%BD%B1'
-        driver.get(url_india)
-        # 点击加载更多，直到全部加载完成
-        a_more = 'pre-defined'
-        while a_more:
-            try:
-                a_more = driver.find_element_by_class_name('more')
-                # a_more.click()
-                driver.execute_script("arguments[0].click();", a_more)
-                time.sleep(2 + random.random() * 3)
-            except NoSuchElementException:
-                a_more = ''
-        # 获取电影链接
-        element_list = driver.find_element_by_class_name('list-wp').find_elements_by_tag_name('a')
-        movie_url_file = open('data/' + self.source_file_name, 'w')
-        for i in range(len(element_list)):
-            url = element_list[i].get_attribute('href')
-            movie_url_file.write(url + '\n')
-            time.sleep(2 + random.random() * 3)
-            if url:
-                yield Request(url, headers=self.headers, meta={'url': url})
-        movie_url_file.close()
-
     def start_requests(self):
+        # self.get_movie_urls()
         url_list = open('data/' + self.source_file_name).readlines()
         url_except_list = open('data/' + self.source_file_name + '.except').readlines()
         for url in url_list:
@@ -168,5 +129,35 @@ class DoubanFavoriteSpider(Spider):
         item['score_num'] = movie.xpath('.//a[@class="rating_people"]/span/text()').extract_first()
         yield item
 
+    def get_movie_urls(self):
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--proxy-server=http://222.240.184.126:8086')
+        driver = webdriver.Chrome(options=options)
+        # 大陆8-10分电影
+        url_dl = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
+        # 香港8-10分电影
+        url_xg = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
+        # 台湾8-10分电影
+        url_tw = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
+        driver.get(url_dl)
+        # 点击加载更多，直到全部加载完成
+        a_more = 'pre-defined'
+        while a_more:
+            try:
+                a_more = driver.find_element_by_class_name('more')
+                # a_more.click()
+                driver.execute_script("arguments[0].click();", a_more)
+                time.sleep(2 + random.random() * 3)
+            except NoSuchElementException:
+                a_more = ''
+        # 获取电影链接
+        element_list = driver.find_element_by_class_name('list-wp').find_elements_by_tag_name('a')
+        movie_url_file = open('data/' + self.source_file_name, 'w')
+        for i in range(len(element_list)):
+            url = element_list[i].get_attribute('href')
+            movie_url_file.write(url + '\n')
+        movie_url_file.close()
 
 # python3 -m scrapy crawl douban_favorite -o data/result/douban_favorite_TEST.csv
