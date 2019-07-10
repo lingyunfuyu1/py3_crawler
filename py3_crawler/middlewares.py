@@ -13,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from scrapy import signals
 from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
 from scrapy.utils.response import response_status_message
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,24 @@ class Py3CrawlerDownloaderMiddleware(object):
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class ProxyMiddleware(object):
+class XHUserAgentMiddleware(object):
+    """This middleware allows spiders to get a random user_agent"""
+
+    def __init__(self, user_agents=None):
+        if user_agents is None:
+            user_agents = ['Scrapy']
+        self.user_agents = user_agents
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings['USER_AGENTS'])
+
+    def process_request(self, request, spider):
+        user_agent = random.choice(self.user_agents)
+        request.headers.setdefault(b'User-Agent', user_agent)
+
+
+class XHProxyMiddleware(object):
     proxy_list = []
 
     def __init__(self):
@@ -140,7 +158,7 @@ class ProxyMiddleware(object):
                     continue
                 if tds[5].string.lower() not in ['http', 'https']:
                     continue
-                ProxyMiddleware.proxy_list.append(tds[5].string.lower() + '://' + tds[1].string + ':' + tds[2].string)
+                XHProxyMiddleware.proxy_list.append(tds[5].string.lower() + '://' + tds[1].string + ':' + tds[2].string)
         except:
             logger.info('Exception occurd when getting proxies from https://www.xicidaili.com/')
         try:
@@ -169,14 +187,14 @@ class ProxyMiddleware(object):
                     continue
                 if protocol.find(',') != -1:
                     protocol = protocol.split(',')[0]
-                ProxyMiddleware.proxy_list.append(protocol + '://' + tds[0].string)
+                XHProxyMiddleware.proxy_list.append(protocol + '://' + tds[0].string)
         except:
             logger.info('Exception occurd when getting proxies from http://www.xiladaili.com/')
         # 统计获取的代理
-        if not ProxyMiddleware.proxy_list:
+        if not XHProxyMiddleware.proxy_list:
             logger.info('Failed to get any proxy!')
         else:
-            logger.info('Successfully got ' + str(len(ProxyMiddleware.proxy_list)) + ' proxies.')
+            logger.info('Successfully got ' + str(len(XHProxyMiddleware.proxy_list)) + ' proxies.')
 
     @staticmethod
     def process_request(request, spider):
@@ -189,12 +207,12 @@ class ProxyMiddleware(object):
             # 手工设置的proxy优先
             if 'proxy' in request.meta:
                 return
-            if not ProxyMiddleware.proxy_list:
+            if not XHProxyMiddleware.proxy_list:
                 raise NoAvailableProxy
             # 随机选择
-            # proxy = random.choice(ProxyMiddleware.proxy_list)
+            # proxy = random.choice(XHProxyMiddleware.proxy_list)
             # 依次使用
-            proxy = ProxyMiddleware.proxy_list[0]
+            proxy = XHProxyMiddleware.proxy_list[0]
             ip = proxy.split('//')[-1].split(':')[0]
             port = proxy.split('//')[-1].split(':')[1]
             max_check_times = 3
@@ -203,8 +221,8 @@ class ProxyMiddleware(object):
                     telnetlib.Telnet(ip, port=port, timeout=3)
                 except:
                     if i + 1 >= max_check_times:
-                        ProxyMiddleware.proxy_list.remove(proxy)
-                        logger.info('Remove proxy due to Telnet-Error: %s [%s remaining]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
+                        XHProxyMiddleware.proxy_list.remove(proxy)
+                        logger.info('Remove proxy due to Telnet-Error: %s [%s remaining]' % (proxy, str(len(XHProxyMiddleware.proxy_list))))
                 else:
                     request.meta['proxy'] = proxy
                     return
@@ -216,10 +234,10 @@ class XHRetryMiddleware(RetryMiddleware):
         if request.meta.get('dont_retry', False):
             logger.info("request.meta.get('dont_retry') is set to 'True'. No need to retry.")
             return response
-        proxy = request.meta.get('proxy', None)
-        if response.status in [403, 404] and proxy in ProxyMiddleware.proxy_list:
-            logger.info('Remove proxy due to Http-Error: %s [%s]' % (proxy, str(len(ProxyMiddleware.proxy_list))))
-            ProxyMiddleware.proxy_list.remove(proxy)
+        # proxy = request.meta.get('proxy', None)
+        # if response.status in [403, 404] and proxy in XHProxyMiddleware.proxy_list:
+        #     logger.info('Remove proxy due to Http-Error: %s [%s]' % (proxy, str(len(XHProxyMiddleware.proxy_list))))
+        #     XHProxyMiddleware.proxy_list.remove(proxy)
         if response.status in self.retry_http_codes:
             logger.info("Retry from XHRetryMiddleware.process_response: " + request.url)
             reason = response_status_message(response.status)

@@ -12,19 +12,15 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 
 from py3_crawler.items import DoubanMovieItem
-from py3_crawler.middlewares import ProxyMiddleware
+from py3_crawler.middlewares import XHProxyMiddleware
 
 
 class DoubanMovieTop250Spider(Spider):
     name = 'douban_movie_top250'
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
-    }
-
     def start_requests(self):
         url = 'https://movie.douban.com/top250'
-        yield Request(url, headers=self.headers, meta={'proxy': 'http://163.204.241.154:9999'})
+        yield Request(url, meta={'proxy': 'http://163.204.241.154:9999'})
 
     def parse(self, response):
         # 命令行调试代码
@@ -49,18 +45,15 @@ class DoubanMovieTop250Spider(Spider):
         if next_url:
             print('++++ next_url', next_url)
             next_url = 'https://movie.douban.com/top250' + next_url[0]
-            yield Request(next_url, headers=self.headers)
+            yield Request(next_url)
 
 
 class DoubanAJAXSpider(Spider):
     name = 'douban_ajax'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
-    }
 
     def start_requests(self):
         url = 'https://movie.douban.com/j/chart/top_list?type=5&interval_id=100%3A90&action=&start=0&limit=20'
-        yield Request(url, headers=self.headers)
+        yield Request(url)
 
     def parse(self, response):
         datas = json.loads(response.body)
@@ -76,21 +69,18 @@ class DoubanAJAXSpider(Spider):
             page_num = re.search(r'start=(\d+)', response.url).group(1)
             page_num = 'start=' + str(int(page_num) + 20)
             next_url = re.sub(r'start=\d+', page_num, response.url)
-            yield Request(next_url, headers=self.headers)
+            yield Request(next_url)
 
 
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
     source_file_name = 'all.9-10.txt'
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
-    }
-
     def start_requests(self):
-        # self.get_movie_urls()
+        if not open('data/' + self.source_file_name).read().strip():
+            self.get_movie_urls()
         url_list = open('data/' + self.source_file_name).readlines()
-        url_except_list = open('data/' + self.source_file_name + '.except').readlines()
+        url_except_list = open('data/except.txt').readlines()
         for url in url_list:
             if url in url_except_list:
                 continue
@@ -101,7 +91,7 @@ class DoubanFavoriteSpider(Spider):
                 # 'proxy': 'https://101.6.54.76:8118',
                 # 'dont_retry': True,
             }
-            yield Request(url.strip(), headers=self.headers, meta=meta)
+            yield Request(url.strip(), meta=meta)
 
     def parse(self, response):
         # 命令行调试代码
@@ -111,11 +101,11 @@ class DoubanFavoriteSpider(Spider):
         if not movie:
             self.logger.info('response:' + response.text)
             proxy = response.meta.get('proxy', None)
-            if proxy in ProxyMiddleware.proxy_list:
-                ProxyMiddleware.proxy_list.remove(response.meta.get('proxy'))
+            if proxy in XHProxyMiddleware.proxy_list:
+                XHProxyMiddleware.proxy_list.remove(response.meta.get('proxy'))
             return
         url = response.meta.get('url')
-        url_except_file = open('data/' + self.source_file_name + '.except', 'a')
+        url_except_file = open('data/except.txt', 'a')
         url_except_file.write(url)
         url_except_file.close()
         item = DoubanMovieItem()
@@ -136,15 +126,8 @@ class DoubanFavoriteSpider(Spider):
         options.add_argument('--disable-gpu')
         # options.add_argument('--proxy-server=http://222.240.184.126:8086')
         driver = webdriver.Chrome(options=options)
-        # 大陆8-10分电影
-        url_dl = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
-        # 香港8-10分电影
-        url_xg = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E9%A6%99%E6%B8%AF'
-        # 台湾8-10分电影
-        url_tw = 'https://movie.douban.com/tag/#/?sort=S&range=8,10&tags=%E7%94%B5%E5%BD%B1,%E5%8F%B0%E6%B9%BE'
-        #
-        url_all = 'https://movie.douban.com/tag/#/?sort=T&range=9,10&tags=%E7%94%B5%E5%BD%B1'
-        driver.get(url_all)
+        url = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
+        driver.get(url)
         # 点击加载更多，直到全部加载完成
         a_more = 'pre-defined'
         while a_more:
