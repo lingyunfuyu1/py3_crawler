@@ -74,7 +74,7 @@ class DoubanAJAXSpider(Spider):
 
 class DoubanFavoriteSpider(Spider):
     name = 'douban_favorite'
-    source_file_name = 'all.9-10.txt'
+    source_file_name = 'TEST.9-10.txt'
 
     def start_requests(self):
         if not open('data/' + self.source_file_name).read().strip():
@@ -126,15 +126,18 @@ class DoubanFavoriteSpider(Spider):
         options.add_argument('--disable-gpu')
         # options.add_argument('--proxy-server=http://222.240.184.126:8086')
         driver = webdriver.Chrome(options=options)
-        url = 'https://movie.douban.com/tag/#/?sort=S&range=8,9&tags=%E7%94%B5%E5%BD%B1,%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86'
+        url = 'https://movie.douban.com/tag/#/?sort=S&range=9,10&tags=%E7%94%B5%E5%BD%B1,%E5%8D%B0%E5%BA%A6'
         driver.get(url)
         # 点击加载更多，直到全部加载完成
         a_more = 'pre-defined'
+        count = 0
         while a_more:
             try:
                 a_more = driver.find_element_by_class_name('more')
                 # a_more.click()
                 driver.execute_script("arguments[0].click();", a_more)
+                count += 1
+                self.logger.info('Cilcked GET MORE %s time(s)' % str(count))
                 time.sleep(2 + random.random() * 3)
             except NoSuchElementException:
                 a_more = ''
@@ -145,5 +148,6 @@ class DoubanFavoriteSpider(Spider):
             url = element_list[i].get_attribute('href')
             movie_url_file.write(url + '\n')
         movie_url_file.close()
+        self.logger.info('Successfully got %s movie links' % str(len(element_list)))
 
 # python3 -m scrapy crawl douban_favorite -o data/result/douban_favorite_TEST.csv
