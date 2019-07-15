@@ -12,7 +12,6 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 
 from py3_crawler.items import DoubanMovieItem
-from py3_crawler.middlewares import XHProxyMiddleware
 
 
 class DoubanMovieTop250Spider(Spider):
@@ -100,10 +99,6 @@ class DoubanFavoriteSpider(Spider):
         movie = response.xpath('//div[@id="content"]')
         if not movie:
             self.logger.info('response:' + response.text)
-            proxy = response.meta.get('proxy', None)
-            if proxy in XHProxyMiddleware.proxy_list:
-                XHProxyMiddleware.proxy_list.remove(response.meta.get('proxy'))
-            return
         url = response.meta.get('url')
         url_except_file = open('data/except.txt', 'a')
         url_except_file.write(url)

@@ -115,3 +115,10 @@ LOG_SHORT_NAMES = False
 RETRY_ENABLED = True
 RETRY_HTTP_CODES = [500, 502, 503, 504, 522, 524, 408]
 RETRY_TIMES = 5
+
+PROXIES = [
+    'https://122.141.74.186:8080',
+    'http://14.20.235.230:9797',
+    'http://14.20.235.44:808',
+    'https://140.143.48.49:1080',
+]
